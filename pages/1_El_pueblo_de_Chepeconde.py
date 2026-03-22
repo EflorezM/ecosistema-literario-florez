@@ -309,7 +309,7 @@ if grado != "":
                 st.success("✨ ¡Todo correcto! Haz clic abajo para descargar tu evaluación.")
                 
             doc = Document()
-            doc.add_heading('EVALUACIÓN DEL PLAN LECTOR', level=1).alignment = WD_ALIGN_PARAGRAPH.CENTER
+            doc.add_heading('EVALUACIÓN DEL PLAN LECTOR (AVANZADO)', level=1).alignment = WD_ALIGN_PARAGRAPH.CENTER
             doc.add_paragraph(f'I.E.: {institucion.upper()}').alignment = WD_ALIGN_PARAGRAPH.CENTER
             doc.add_paragraph(f'Obra: {nombre_de_la_obra} | Autor: Eduardo Florez Montero').alignment = WD_ALIGN_PARAGRAPH.CENTER
             doc.add_paragraph('_' * 50).alignment = WD_ALIGN_PARAGRAPH.CENTER
@@ -321,21 +321,28 @@ if grado != "":
             doc.add_paragraph(f'Estudiante: {nombre}\nNivel: {nivel} | Grado: {grado} | Sección: {seccion} | Fecha: {fecha_str}')
             doc.add_paragraph(f'Área/Curso: {texto_area} | Docente a cargo: {texto_prof}')
             
-            doc.add_heading('NIVEL 1 (Literal)', level=2)
-            doc.add_paragraph(p1).bold = True
-            doc.add_paragraph(f'Respuesta: {q1 if q1.strip() else "[No respondió]"}\n')
-            doc.add_paragraph(p2).bold = True
-            doc.add_paragraph(f'Respuesta: {q2 if q2.strip() else "[No respondió]"}\n')
+            # --- FUNCIÓN AYUDANTE PARA JUSTIFICAR TEXTO ---
+            def agregar_bloque_justificado(pregunta, respuesta):
+                p_pregunta = doc.add_paragraph()
+                p_pregunta.alignment = WD_ALIGN_PARAGRAPH.JUSTIFY
+                p_pregunta.add_run(pregunta).bold = True
+                
+                p_respuesta = doc.add_paragraph()
+                p_respuesta.alignment = WD_ALIGN_PARAGRAPH.JUSTIFY
+                texto_respuesta = respuesta if respuesta.strip() else "[No respondió]"
+                p_respuesta.add_run(f'Respuesta: {texto_respuesta}\n')
+
+            # --- APLICANDO EL JUSTIFICADO A LOS NIVELES ---
+            doc.add_heading('NIVEL 1 (Análisis Literario)', level=2)
+            agregar_bloque_justificado(p1, q1)
+            agregar_bloque_justificado(p2, q2)
             
-            doc.add_heading('NIVEL 2 (Inferencia)', level=2)
-            doc.add_paragraph(p3).bold = True
-            doc.add_paragraph(f'Respuesta: {q3 if q3.strip() else "[No respondió]"}\n')
-            doc.add_paragraph(p4).bold = True
-            doc.add_paragraph(f'Respuesta: {q4 if q4.strip() else "[No respondió]"}\n')
+            doc.add_heading('NIVEL 2 (Inferencia Compleja)', level=2)
+            agregar_bloque_justificado(p3, q3)
+            agregar_bloque_justificado(p4, q4)
             
-            doc.add_heading('NIVEL 3 (Crítico)', level=2)
-            doc.add_paragraph(p5).bold = True
-            doc.add_paragraph(f'Respuesta: {q5 if q5.strip() else "[No respondió]"}\n')
+            doc.add_heading('NIVEL 3 (Micro-Ensayo Crítico)', level=2)
+            agregar_bloque_justificado(p5, q5)
             
             doc.add_page_break()
             doc.add_heading(f'Lista de Cotejo ({grado} Secundaria)', level=2)
@@ -345,7 +352,7 @@ if grado != "":
             hdr_cells = table.rows[0].cells
             hdr_cells[0].text, hdr_cells[1].text, hdr_cells[2].text, hdr_cells[3].text, hdr_cells[4].text = 'CRITERIOS DE EVALUACIÓN', 'INICIO', 'PROCESO', 'LOGRADO', 'DESTACADO'
             
-            criterios = [c1, c2, c3] # Aquí se insertan los criterios específicos del grado
+            criterios = [c1, c2, c3] 
             
             for crit in criterios:
                 row_cells = table.add_row().cells
@@ -359,7 +366,7 @@ if grado != "":
             st.download_button(
                 label="📥 Confirmar Registro y Descargar Evidencia", 
                 data=bio.getvalue(), 
-                file_name=f"Chepeconde_{grado}_{seccion}_{nombre.replace(' ', '_')}.docx", 
+                file_name=f"Evaluacion_{grado}_{seccion}_{nombre.replace(' ', '_')}.docx", 
                 mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
                 on_click=registrar_y_bloquear,
                 args=(nombre, institucion, nivel, grado, seccion, area_curso, profesor, nombre_de_la_obra),
