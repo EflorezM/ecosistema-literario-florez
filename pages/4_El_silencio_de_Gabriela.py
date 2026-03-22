@@ -312,21 +312,28 @@ if grado != "":
             doc.add_paragraph(f'Estudiante: {nombre}\nNivel: {nivel} | Grado: {grado} | Sección: {seccion} | Fecha: {fecha_str}')
             doc.add_paragraph(f'Área/Curso: {texto_area} | Docente a cargo: {texto_prof}')
             
+            # --- FUNCIÓN AYUDANTE PARA JUSTIFICAR TEXTO ---
+            def agregar_bloque_justificado(pregunta, respuesta):
+                p_pregunta = doc.add_paragraph()
+                p_pregunta.alignment = WD_ALIGN_PARAGRAPH.JUSTIFY
+                p_pregunta.add_run(pregunta).bold = True
+                
+                p_respuesta = doc.add_paragraph()
+                p_respuesta.alignment = WD_ALIGN_PARAGRAPH.JUSTIFY
+                texto_respuesta = respuesta if respuesta.strip() else "[No respondió]"
+                p_respuesta.add_run(f'Respuesta: {texto_respuesta}\n')
+
+            # --- APLICANDO EL JUSTIFICADO A LOS NIVELES ---
             doc.add_heading('NIVEL 1 (Análisis Literario)', level=2)
-            doc.add_paragraph(p1).bold = True
-            doc.add_paragraph(f'Respuesta: {q1 if q1.strip() else "[No respondió]"}\n')
-            doc.add_paragraph(p2).bold = True
-            doc.add_paragraph(f'Respuesta: {q2 if q2.strip() else "[No respondió]"}\n')
+            agregar_bloque_justificado(p1, q1)
+            agregar_bloque_justificado(p2, q2)
             
             doc.add_heading('NIVEL 2 (Inferencia Compleja)', level=2)
-            doc.add_paragraph(p3).bold = True
-            doc.add_paragraph(f'Respuesta: {q3 if q3.strip() else "[No respondió]"}\n')
-            doc.add_paragraph(p4).bold = True
-            doc.add_paragraph(f'Respuesta: {q4 if q4.strip() else "[No respondió]"}\n')
+            agregar_bloque_justificado(p3, q3)
+            agregar_bloque_justificado(p4, q4)
             
             doc.add_heading('NIVEL 3 (Micro-Ensayo Crítico)', level=2)
-            doc.add_paragraph(p5).bold = True
-            doc.add_paragraph(f'Respuesta: {q5 if q5.strip() else "[No respondió]"}\n')
+            agregar_bloque_justificado(p5, q5)
             
             doc.add_page_break()
             doc.add_heading(f'Lista de Cotejo ({grado} Secundaria)', level=2)
@@ -350,7 +357,7 @@ if grado != "":
             st.download_button(
                 label="📥 Confirmar Registro y Descargar Evidencia", 
                 data=bio.getvalue(), 
-                file_name=f"Gabriela_{grado}_{seccion}_{nombre.replace(' ', '_')}.docx", 
+                file_name=f"Evaluacion_{grado}_{seccion}_{nombre.replace(' ', '_')}.docx", 
                 mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
                 on_click=registrar_y_bloquear,
                 args=(nombre, institucion, nivel, grado, seccion, area_curso, profesor, nombre_de_la_obra),
