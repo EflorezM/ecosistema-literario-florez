@@ -11,43 +11,48 @@ import gspread
 
 st.set_page_config(page_title="Chepeconde - Plan Lector", page_icon="📖", layout="centered")
 
-# --- CONEXIÓN A GOOGLE SHEETS ---
+# --- CONEXIÓN A GOOGLE SHEETS Y CANDADO DE 5 CERROJOS ---
 @st.cache_resource
 def get_google_sheet():
     creds_json = st.secrets["google_credentials"]
     creds_dict = json.loads(creds_json)
     
-    # ESCUDO ANTI-CORCHETES: Si el texto se guardó como lista por accidente, extraemos el diccionario
+    # ESCUDO ANTI-CORCHETES
     if isinstance(creds_dict, list):
         creds_dict = creds_dict[0]
         
     client = gspread.service_account_from_dict(creds_dict)
     return client.open("Registro_Plan_Lector").sheet1
 
-def ya_participo(nombre, grado, seccion):
+def ya_participo(nombre, inst, grado, seccion, obra):
     try:
         sheet = get_google_sheet()
         data = sheet.get_all_values()
         if not data:
-            sheet.append_row(["Fecha", "Estudiante", "Institución", "Nivel", "Grado", "Sección", "Área", "Profesor", "Estado"])
             return False
         for row in data[1:]:
-            if len(row) >= 6:
-                if row[1].strip().lower() == nombre.strip().lower() and row[4] == grado and row[5] == seccion:
+            # Verificamos que la fila tenga datos suficientes (mínimo 9 columnas)
+            if len(row) >= 9:
+                # CANDADO DE 5 CERROJOS: Nombre + Colegio + Grado + Sección + Obra
+                if (row[1].strip().lower() == nombre.strip().lower() and 
+                    row[2].strip().lower() == inst.strip().lower() and 
+                    row[4] == grado and 
+                    row[5] == seccion and 
+                    row[8].strip().lower() == obra.strip().lower()):
                     return True
         return False
     except Exception as e:
-        st.error(f"Error de lectura en la Base de Datos: {e}")
         return False 
 
-def registrar_y_bloquear(nombre, inst, nivel, grado, seccion, area, prof):
+def registrar_y_bloquear(nombre, inst, nivel, grado, seccion, area, prof, obra):
     st.session_state.ficha_completada = True
     try:
         sheet = get_google_sheet()
         fecha_str = datetime.now().strftime("%d/%m/%Y %H:%M")
-        sheet.append_row([fecha_str, nombre.upper(), inst.upper(), nivel, grado, seccion, area.upper(), prof, "COMPLETADO"])
+        # Guarda 10 datos, incluyendo la OBRA en la columna I
+        sheet.append_row([fecha_str, nombre.upper(), inst.upper(), nivel, grado, seccion, area.upper(), prof, obra.upper(), "COMPLETADO"])
     except Exception as e:
-        st.error(f"Error al guardar en Google Sheets: {e}")
+        pass
 
 # --- FUNCIONES DE ESTADO ---
 if 'ficha_completada' not in st.session_state: st.session_state.ficha_completada = False
@@ -70,11 +75,13 @@ def obtener_minimos(grado):
     return {"q3": 10, "q4": 10, "q5": 10}
 
 # --- 1. LA BÓVEDA DE SEGURIDAD ---
+nombre_de_la_obra = "El Pueblo de Chepeconde"
+
 if 'autenticado_chepe' not in st.session_state: st.session_state.autenticado_chepe = False
 
 if not st.session_state.autenticado_chepe:
     st.title("📖 Ecosistema Literario Transmedia")
-    st.subheader("Obra: El Pueblo de Chepeconde")
+    st.subheader(f"Obra: {nombre_de_la_obra}")
     st.write("Autor: Eduardo Florez Montero")
     st.markdown("---")
     st.info("🔒 **Acceso Exclusivo:** Escribe la Clave de Aula que te indicó tu profesor.")
@@ -82,7 +89,9 @@ if not st.session_state.autenticado_chepe:
     clave = st.text_input("🔑 Clave de Acceso *:", type="password", autocomplete="new-password")
     
     if st.button("Desbloquear Evaluación", use_container_width=True):
-        claves_validas = ["CHEPECONDE-2026", "AGUSTIN-2A", "CARMELITAS-3B"]
+        # AQUI ESTÁ TU LLAVERO MAESTRO. Puedes agregar todos los códigos que quieras separados por comas y comillas.
+        claves_validas = ["CHEPECONDE-2026", "AGUSTIN-3A", "AGUSTIN-3B", "FATIMA-2C", "BELEM-UNICA"]
+        
         if clave in claves_validas: 
             st.session_state.autenticado_chepe = True
             st.rerun()
@@ -95,8 +104,8 @@ if 'ficha_iniciada_chepe' not in st.session_state: st.session_state.ficha_inicia
 if 'extra_time_used' not in st.session_state: st.session_state.extra_time_used = False
 
 if not st.session_state.ficha_iniciada_chepe:
-    st.success("✅ ¡Clave aceptada! Bienvenido al ecosistema de El Pueblo de Chepeconde.")
-    st.warning("⚠️ **ATENCIÓN: TIENES UN SOLO INTENTO**\nEl sistema registrará tu nombre. No podrás volver a dar la evaluación desde ningún otro dispositivo.")
+    st.success("✅ ¡Clave aceptada! Bienvenido al ecosistema.")
+    st.warning("⚠️ **ATENCIÓN: TIENES UN SOLO INTENTO**\nEl sistema registrará tu nombre, colegio, grado y sección. No podrás volver a dar la evaluación.")
     
     try:
         st.image("portada_chepeconde.jpg", width=250)
@@ -165,7 +174,7 @@ with st.sidebar:
         st.write("Aún puedes descargar tu avance.")
 
 # --- 3. CONTENIDO LITERARIO Y VALIDACIONES ---
-st.markdown("### 📖 EL PUEBLO DE CHEPECONDE")
+st.markdown(f"### 📖 {nombre_de_la_obra.upper()}")
 st.markdown("**Autor:** Eduardo Florez Montero | **Categoría:** Pre-Adolescentes (1ro a 3ro Sec.)")
 st.markdown("---")
 
@@ -231,7 +240,7 @@ if st.session_state.intento_descarga and not tiempo_agotado:
     elif palabras_q5 < minimos["q5"]: st.markdown(f"<div style='color:#e74c3c; font-size:13px; margin-top:-10px; margin-bottom:10px;'>⚠️ Mínimo {minimos['q5']} palabras (tienes {palabras_q5}).</div>", unsafe_allow_html=True)
 
 st.markdown("---")
-st.error("🚨 **ÚLTIMO PASO:** Al generar el Word, tu nombre quedará registrado para evitar duplicados en cualquier dispositivo.")
+st.error("🚨 **ÚLTIMO PASO:** Al generar el Word, tu nombre y salón quedarán registrados para evitar duplicados.")
 
 # --- LÓGICA DE VALIDACIÓN CENTRALIZADA ---
 faltantes_personales = not institucion.strip() or not nombre.strip() or nivel == "" or grado == "" or seccion == "" or not area_curso.strip()
@@ -259,10 +268,11 @@ if not st.session_state.intento_descarga or hay_errores:
 # BOTÓN REAL: CONEXIÓN A GOOGLE SHEETS Y DESCARGA
 else:
     with st.spinner("Validando usuario en la Base de Datos segura..."):
-        duplicado = ya_participo(nombre, grado, seccion)
+        # PASAMOS LOS 5 PARÁMETROS AL CANDADO
+        duplicado = ya_participo(nombre, institucion, grado, seccion, nombre_de_la_obra)
         
     if duplicado:
-        st.error(f"🛑 **BLOQUEO DE SEGURIDAD:** El estudiante '{nombre.upper()}' ({grado} '{seccion}') ya tiene una evaluación registrada en la base de datos central. No se permiten intentos duplicados.")
+        st.error(f"🛑 **BLOQUEO DE SEGURIDAD:** El estudiante '{nombre.upper()}' de la institución '{institucion.upper()}' ({grado} '{seccion}') ya tiene una evaluación registrada para la obra '{nombre_de_la_obra}'. No se permiten intentos duplicados en la misma sección.")
     else:
         if tiempo_agotado:
             st.info("⏱️ El tiempo se agotó. Validado correctamente. Descargando tu avance parcial...")
@@ -272,7 +282,7 @@ else:
         doc = Document()
         doc.add_heading('EVALUACIÓN DEL PLAN LECTOR', level=1).alignment = WD_ALIGN_PARAGRAPH.CENTER
         doc.add_paragraph(f'I.E.: {institucion.upper()}').alignment = WD_ALIGN_PARAGRAPH.CENTER
-        doc.add_paragraph('Obra: El Pueblo de Chepeconde | Autor: Eduardo Florez Montero').alignment = WD_ALIGN_PARAGRAPH.CENTER
+        doc.add_paragraph(f'Obra: {nombre_de_la_obra} | Autor: Eduardo Florez Montero').alignment = WD_ALIGN_PARAGRAPH.CENTER
         doc.add_paragraph('_' * 50).alignment = WD_ALIGN_PARAGRAPH.CENTER
         
         fecha_str = fecha_input.strftime("%d/%m/%Y")
@@ -325,7 +335,7 @@ else:
             file_name=f"Chepeconde_{grado}_{seccion}_{nombre.replace(' ', '_')}.docx", 
             mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
             on_click=registrar_y_bloquear,
-            args=(nombre, institucion, nivel, grado, seccion, area_curso, profesor),
+            args=(nombre, institucion, nivel, grado, seccion, area_curso, profesor, nombre_de_la_obra),
             type="primary",
             use_container_width=True
         )
