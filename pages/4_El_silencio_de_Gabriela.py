@@ -48,11 +48,11 @@ def registrar_y_bloquear(nombre, inst, nivel, grado, seccion, area, prof, obra):
 if 'ficha_completada_cat4' not in st.session_state: st.session_state.ficha_completada_cat4 = False
 if 'intento_descarga_cat4' not in st.session_state: st.session_state.intento_descarga_cat4 = False
 
-if st.session_state.ficha_completada_cat4:
-    st.error("🔒 **EVALUACIÓN ENTREGADA Y BLOQUEADA**")
-    st.success("Has generado tu evidencia con éxito y tu participación ha sido registrada en el sistema central.")
-    st.info("Por favor, envía el archivo Word que se descargó a tu profesor.")
-    st.stop()
+if st.session_state.ficha_completada:
+    st.success("✅ **¡PRUEBA ENTREGADA CON ÉXITO!**")
+    st.info("Has generado tu documento correctamente y tu participación ya está registrada de forma segura en el colegio.")
+    st.write("Por favor, envía el archivo Word que se descargó a tu profesor(a). ¡Buen trabajo!")
+    st.stop() # Esto es lo que detiene la página de forma invisible
 
 def contiene_spam(texto):
     for palabra in texto.split():
