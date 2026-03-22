@@ -16,6 +16,11 @@ st.set_page_config(page_title="Chepeconde - Plan Lector", page_icon="📖", layo
 def get_google_sheet():
     creds_json = st.secrets["google_credentials"]
     creds_dict = json.loads(creds_json)
+    
+    # ESCUDO ANTI-CORCHETES: Si el texto se guardó como lista por accidente, extraemos el diccionario
+    if isinstance(creds_dict, list):
+        creds_dict = creds_dict[0]
+        
     client = gspread.service_account_from_dict(creds_dict)
     return client.open("Registro_Plan_Lector").sheet1
 
@@ -32,7 +37,7 @@ def ya_participo(nombre, grado, seccion):
                     return True
         return False
     except Exception as e:
-        st.error(f"Error al leer la base de datos: {e}")
+        st.error(f"Error de lectura en la Base de Datos: {e}")
         return False 
 
 def registrar_y_bloquear(nombre, inst, nivel, grado, seccion, area, prof):
