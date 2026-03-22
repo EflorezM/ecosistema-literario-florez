@@ -49,9 +49,9 @@ if 'ficha_completada_cat1' not in st.session_state: st.session_state.ficha_compl
 if 'intento_descarga_cat1' not in st.session_state: st.session_state.intento_descarga_cat1 = False
 
 if st.session_state.ficha_completada_cat1:
-    st.error("🔒 **¡TAREA ENTREGADA!**")
-    st.success("¡Felicidades! Has terminado tu evaluación. Tu trabajo ya está guardado.")
-    st.info("Dile a tus papis que envíen el archivo Word a tu profesor(a).")
+    st.success("✅ **¡TAREA ENTREGADA CON ÉXITO!**")
+    st.info("¡Felicidades! Has terminado tu evaluación y tu trabajo ya está guardado seguro.")
+    st.write("Por favor, dile a tus papis que envíen el archivo Word a tu profesor(a). ¡Eres un campeón/a!")
     st.stop()
 
 def contiene_spam(texto):
