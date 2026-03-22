@@ -15,7 +15,7 @@ with col1:
     ### 🚀 Más que un libro, una experiencia inmersiva
     Estimados directores, docentes y estudiantes:
     
-    Leer ya no es una actividad de una sola vía. El **Ecosistema Literario de Eduardo Florez Montero** transforma el Plan Lector tradicional en una aventura gamificada, diseñada para conectar con las nuevas generaciones y facilitar el trabajo en el aula.
+    Leer ya no es una actividad de una sola vía. El **Ecosistema Literario de ICREA EDITORES** transforma el Plan Lector tradicional en una aventura gamificada, diseñada para conectar con las nuevas generaciones y facilitar el trabajo en el aula.
     
     Aquí, la literatura se encuentra con la tecnología. Nuestros libros impresos y digitales son la puerta de entrada a esta plataforma exclusiva donde evaluamos la comprensión, fomentamos el pensamiento crítico y construimos valores.
     """)
