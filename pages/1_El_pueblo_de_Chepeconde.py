@@ -6,31 +6,57 @@ from docx.shared import Pt, RGBColor
 from docx.enum.text import WD_ALIGN_PARAGRAPH
 import io
 import streamlit.components.v1 as components
+import json
+import gspread
 
 st.set_page_config(page_title="Chepeconde - Plan Lector", page_icon="📖", layout="centered")
 
-# --- FUNCIONES Y ESTADOS DE SESIÓN ---
-def bloquear_ficha():
+# --- CONEXIÓN A GOOGLE SHEETS ---
+@st.cache_resource
+def get_google_sheet():
+    creds_json = st.secrets["google_credentials"]
+    creds_dict = json.loads(creds_json)
+    client = gspread.service_account_from_dict(creds_dict)
+    return client.open("Registro_Plan_Lector").sheet1
+
+def ya_participo(nombre, grado, seccion):
+    try:
+        sheet = get_google_sheet()
+        data = sheet.get_all_values()
+        if not data:
+            sheet.append_row(["Fecha", "Estudiante", "Institución", "Nivel", "Grado", "Sección", "Área", "Profesor", "Estado"])
+            return False
+        for row in data[1:]:
+            if len(row) >= 6:
+                # Compara que no exista alguien con el mismo Nombre, Grado y Sección
+                if row[1].strip().lower() == nombre.strip().lower() and row[4] == grado and row[5] == seccion:
+                    return True
+        return False
+    except Exception as e:
+        return False # Fallback de seguridad por si hay un micro-corte de internet
+
+def registrar_y_bloquear(nombre, inst, nivel, grado, seccion, area, prof):
     st.session_state.ficha_completada = True
+    try:
+        sheet = get_google_sheet()
+        fecha_str = datetime.now().strftime("%d/%m/%Y %H:%M")
+        sheet.append_row([fecha_str, nombre.upper(), inst.upper(), nivel, grado, seccion, area.upper(), prof, "COMPLETADO"])
+    except:
+        pass
 
-if 'ficha_completada' not in st.session_state:
-    st.session_state.ficha_completada = False
-
-# Nueva variable de estado para recordar si el alumno ya intentó descargar
-if 'intento_descarga' not in st.session_state:
-    st.session_state.intento_descarga = False
+# --- FUNCIONES DE ESTADO ---
+if 'ficha_completada' not in st.session_state: st.session_state.ficha_completada = False
+if 'intento_descarga' not in st.session_state: st.session_state.intento_descarga = False
 
 if st.session_state.ficha_completada:
     st.error("🔒 **EVALUACIÓN ENTREGADA Y BLOQUEADA**")
-    st.success("Has generado y descargado tu evidencia con éxito. Solo se permite un intento por estudiante.")
-    st.info("Por favor, envía el archivo Word a tu profesor.")
+    st.success("Has generado tu evidencia con éxito y tu participación ha sido registrada en el sistema central.")
+    st.info("Por favor, envía el archivo Word que se descargó a tu profesor.")
     st.stop()
 
 def contiene_spam(texto):
-    palabras = texto.split()
-    for palabra in palabras:
-        if len(palabra) > 20: 
-            return True
+    for palabra in texto.split():
+        if len(palabra) > 20: return True
     return False
 
 def obtener_minimos(grado):
@@ -39,8 +65,7 @@ def obtener_minimos(grado):
     return {"q3": 10, "q4": 10, "q5": 10}
 
 # --- 1. LA BÓVEDA DE SEGURIDAD ---
-if 'autenticado_chepe' not in st.session_state:
-    st.session_state.autenticado_chepe = False
+if 'autenticado_chepe' not in st.session_state: st.session_state.autenticado_chepe = False
 
 if not st.session_state.autenticado_chepe:
     st.title("📖 Ecosistema Literario Transmedia")
@@ -61,19 +86,16 @@ if not st.session_state.autenticado_chepe:
     st.stop()
 
 # --- 2. SISTEMA DE TIEMPO INTELIGENTE ---
-if 'ficha_iniciada_chepe' not in st.session_state:
-    st.session_state.ficha_iniciada_chepe = False
-
-if 'extra_time_used' not in st.session_state:
-    st.session_state.extra_time_used = False
+if 'ficha_iniciada_chepe' not in st.session_state: st.session_state.ficha_iniciada_chepe = False
+if 'extra_time_used' not in st.session_state: st.session_state.extra_time_used = False
 
 if not st.session_state.ficha_iniciada_chepe:
     st.success("✅ ¡Clave aceptada! Bienvenido al ecosistema de El Pueblo de Chepeconde.")
-    st.warning("⚠️ **ATENCIÓN: TIENES UN SOLO INTENTO**\nAl descargar tu Word, el sistema se bloqueará permanentemente. Los campos con asterisco (*) son obligatorios.")
+    st.warning("⚠️ **ATENCIÓN: TIENES UN SOLO INTENTO**\nEl sistema registrará tu nombre. No podrás volver a dar la evaluación desde ningún otro dispositivo.")
     
     try:
         st.image("portada_chepeconde.jpg", width=250)
-    except FileNotFoundError:
+    except:
         st.caption("(Aquí aparecerá la portada de tu libro)")
         
     st.info("👋 Tienes 20 minutos para resolver tu evaluación.")
@@ -91,7 +113,6 @@ segundos_restantes = (st.session_state.minutos_asignados_chepe * 60) - segundos_
 tiempo_agotado = segundos_restantes <= 0
 bloquear_preguntas = tiempo_agotado 
 
-# --- MENÚ LATERAL: RELOJ VISUAL ---
 with st.sidebar:
     st.markdown("### ⏱️ Tiempo Restante")
     if not tiempo_agotado:
@@ -111,8 +132,8 @@ with st.sidebar:
                     clearInterval(intervalo);
                     display.innerHTML = "00:00";
                     display.style.color = "#e74c3c";
-                    aviso.innerHTML = "⚠️ Tiempo agotado.";
                     aviso.style.display = "block";
+                    aviso.innerHTML = "⚠️ Tiempo agotado.";
                 }} else {{
                     var min = Math.floor(tiempo / 60).toString().padStart(2, '0');
                     var sec = (tiempo % 60).toString().padStart(2, '0');
@@ -138,12 +159,11 @@ with st.sidebar:
         st.error("## 00:00\n⚠️ TIEMPO AGOTADO")
         st.write("Aún puedes descargar tu avance.")
 
-# --- 3. CONTENIDO LITERARIO Y VALIDACIONES EN LÍNEA ---
+# --- 3. CONTENIDO LITERARIO Y VALIDACIONES ---
 st.markdown("### 📖 EL PUEBLO DE CHEPECONDE")
 st.markdown("**Autor:** Eduardo Florez Montero | **Categoría:** Pre-Adolescentes (1ro a 3ro Sec.)")
 st.markdown("---")
 
-# Variable CSS para el mensaje de error inline
 css_error = "<div style='color:#e74c3c; font-size:13px; margin-top:-10px; margin-bottom:10px;'>⚠️ Este campo es obligatorio</div>"
 
 institucion = st.text_input("Institución Educativa (Nombre completo) *:", disabled=False)
@@ -206,17 +226,10 @@ if st.session_state.intento_descarga and not tiempo_agotado:
     elif palabras_q5 < minimos["q5"]: st.markdown(f"<div style='color:#e74c3c; font-size:13px; margin-top:-10px; margin-bottom:10px;'>⚠️ Mínimo {minimos['q5']} palabras (tienes {palabras_q5}).</div>", unsafe_allow_html=True)
 
 st.markdown("---")
-st.error("🚨 **ÚLTIMO PASO:** Al generar el Word, el sistema bloqueará tu acceso permanentemente.")
+st.error("🚨 **ÚLTIMO PASO:** Al generar el Word, tu nombre quedará registrado para evitar duplicados en cualquier dispositivo.")
 
 # --- LÓGICA DE VALIDACIÓN CENTRALIZADA ---
-faltantes_personales = []
-if not institucion.strip(): faltantes_personales.append("Institución Educativa")
-if not nombre.strip(): faltantes_personales.append("Estudiante")
-if nivel == "": faltantes_personales.append("Nivel")
-if grado == "": faltantes_personales.append("Grado")
-if seccion == "": faltantes_personales.append("Sección")
-if not area_curso.strip(): faltantes_personales.append("Área o Curso")
-
+faltantes_personales = not institucion.strip() or not nombre.strip() or nivel == "" or grado == "" or seccion == "" or not area_curso.strip()
 preguntas_vacias = not q1.strip() or not q2.strip() or not q3.strip() or not q4.strip() or not q5.strip()
 faltan_palabras = palabras_q3 < minimos["q3"] or palabras_q5 < minimos["q5"]
 hay_spam = contiene_spam(q1) or contiene_spam(q2) or contiene_spam(q3) or contiene_spam(q4) or contiene_spam(q5)
@@ -225,84 +238,89 @@ hay_errores = False
 if faltantes_personales: hay_errores = True
 if not tiempo_agotado and (preguntas_vacias or faltan_palabras or hay_spam): hay_errores = True
 
-# BOTÓN FALSO (Actúa como verificador)
-if hay_errores:
+# BOTÓN DE PRE-VALIDACIÓN
+if not st.session_state.intento_descarga or hay_errores:
     if st.button("📥 Generar y Descargar mi Evidencia", type="primary", use_container_width=True):
         st.session_state.intento_descarga = True
-        st.rerun() # Recarga la página para mostrar los mensajes rojos en línea
+        st.rerun()
     
-    # Mensajes de resumen en la parte inferior
-    if st.session_state.intento_descarga:
-        if faltantes_personales:
-            st.error(f"⚠️ **IMPOSIBLE DESCARGAR:** Faltan datos obligatorios ({', '.join(faltantes_personales)}). Revisa las alertas en rojo arriba.")
+    if st.session_state.intento_descarga and hay_errores:
+        if faltantes_personales: st.error("⚠️ **IMPOSIBLE DESCARGAR:** Faltan datos obligatorios. Revisa las alertas en rojo arriba.")
         elif not tiempo_agotado:
             if preguntas_vacias: st.warning("⚠️ **AÚN TIENES TIEMPO:** Te falta responder algunas preguntas.")
-            if faltan_palabras: st.warning("⚠️ **FALTAN PALABRAS:** Algunas respuestas no cumplen con la extensión mínima de tu grado.")
+            if faltan_palabras: st.warning("⚠️ **FALTAN PALABRAS:** Algunas respuestas no cumplen con la extensión mínima.")
             if hay_spam: st.error("⚠️ Hemos detectado caracteres repetidos. Escribe con normalidad.")
 
-# BOTÓN REAL (Solo aparece si todo está perfecto o si se acabó el tiempo)
+# BOTÓN REAL: CONEXIÓN A GOOGLE SHEETS Y DESCARGA
 else:
-    if tiempo_agotado:
-        st.info("⏱️ El tiempo se agotó. Descargando tu avance parcial...")
+    with st.spinner("Validando usuario en la Base de Datos segura..."):
+        duplicado = ya_participo(nombre, grado, seccion)
+        
+    if duplicado:
+        st.error(f"🛑 **BLOQUEO DE SEGURIDAD:** El estudiante '{nombre.upper()}' ({grado} '{seccion}') ya tiene una evaluación registrada en la base de datos central. No se permiten intentos duplicados.")
     else:
-        st.success("✨ ¡Todo correcto! Haz clic abajo para descargar.")
+        if tiempo_agotado:
+            st.info("⏱️ El tiempo se agotó. Validado correctamente. Descargando tu avance parcial...")
+        else:
+            st.success("✨ ¡Todo correcto! Validado en base de datos. Haz clic abajo para descargar y registrar tu evaluación.")
+            
+        doc = Document()
+        doc.add_heading('EVALUACIÓN DEL PLAN LECTOR', level=1).alignment = WD_ALIGN_PARAGRAPH.CENTER
+        doc.add_paragraph(f'I.E.: {institucion.upper()}').alignment = WD_ALIGN_PARAGRAPH.CENTER
+        doc.add_paragraph('Obra: El Pueblo de Chepeconde | Autor: Eduardo Florez Montero').alignment = WD_ALIGN_PARAGRAPH.CENTER
+        doc.add_paragraph('_' * 50).alignment = WD_ALIGN_PARAGRAPH.CENTER
         
-    doc = Document()
-    doc.add_heading('EVALUACIÓN DEL PLAN LECTOR', level=1).alignment = WD_ALIGN_PARAGRAPH.CENTER
-    doc.add_paragraph(f'I.E.: {institucion.upper()}').alignment = WD_ALIGN_PARAGRAPH.CENTER
-    doc.add_paragraph('Obra: El Pueblo de Chepeconde | Autor: Eduardo Florez Montero').alignment = WD_ALIGN_PARAGRAPH.CENTER
-    doc.add_paragraph('_' * 50).alignment = WD_ALIGN_PARAGRAPH.CENTER
-    
-    fecha_str = fecha_input.strftime("%d/%m/%Y")
-    texto_area = area_curso.strip()
-    texto_prof = profesor.strip() if profesor.strip() else "No especificado"
+        fecha_str = fecha_input.strftime("%d/%m/%Y")
+        texto_area = area_curso.strip()
+        texto_prof = profesor.strip() if profesor.strip() else "No especificado"
 
-    doc.add_paragraph(f'Estudiante: {nombre}\nNivel: {nivel} | Grado: {grado} | Sección: {seccion} | Fecha: {fecha_str}')
-    doc.add_paragraph(f'Área/Curso: {texto_area} | Docente a cargo: {texto_prof}')
-    
-    doc.add_heading('NIVEL 1 (Literal)', level=2)
-    doc.add_paragraph('1) ¿Quién es el personaje principal y cuál es su mayor característica?').bold = True
-    doc.add_paragraph(f'Respuesta: {q1 if q1.strip() else "[No respondió]"}\n')
-    doc.add_paragraph('2) Describe brevemente cómo es El Pueblo de Chepeconde:').bold = True
-    doc.add_paragraph(f'Respuesta: {q2 if q2.strip() else "[No respondió]"}\n')
-    
-    doc.add_heading('NIVEL 2 (Inferencia)', level=2)
-    doc.add_paragraph('3) ¿Por qué crees que el protagonista tomó esa decisión difícil? ¿Qué hubieras hecho tú?').bold = True
-    doc.add_paragraph(f'Respuesta: {q3 if q3.strip() else "[No respondió]"}\n')
-    doc.add_paragraph('4) Identifica el conflicto principal de la historia. ¿Era un problema interno o externo?').bold = True
-    doc.add_paragraph(f'Respuesta: {q4 if q4.strip() else "[No respondió]"}\n')
-    
-    doc.add_heading('NIVEL 3 (Crítico)', level=2)
-    doc.add_paragraph('5) ¿Qué enseñanza o valor nos deja la historia de Chepeconde para la sociedad actual?').bold = True
-    doc.add_paragraph(f'Respuesta: {q5 if q5.strip() else "[No respondió]"}\n')
-    
-    doc.add_page_break()
-    doc.add_heading('Lista de Cotejo - Evaluación del Docente', level=2)
-    
-    table = doc.add_table(rows=1, cols=5)
-    table.style = 'Table Grid'
-    hdr_cells = table.rows[0].cells
-    hdr_cells[0].text, hdr_cells[1].text, hdr_cells[2].text, hdr_cells[3].text, hdr_cells[4].text = 'CRITERIOS DE EVALUACIÓN', 'INICIO', 'PROCESO', 'LOGRADO', 'DESTACADO'
-    criterios = [
-        "NIVEL 1: Identifica correctamente personajes y escenarios basándose en la obra.",
-        "NIVEL 2: Analiza los motivos y clasifica los conflictos de la trama.",
-        "NIVEL 3: Argumenta sólidamente una reflexión vinculada al texto."
-    ]
-    for crit in criterios:
-        row_cells = table.add_row().cells
-        row_cells[0].text, row_cells[1].text, row_cells[2].text, row_cells[3].text, row_cells[4].text = crit, "[   ]", "[   ]", "[   ]", "[   ]"
+        doc.add_paragraph(f'Estudiante: {nombre}\nNivel: {nivel} | Grado: {grado} | Sección: {seccion} | Fecha: {fecha_str}')
+        doc.add_paragraph(f'Área/Curso: {texto_area} | Docente a cargo: {texto_prof}')
         
-    doc.add_paragraph('\nObservaciones / Feedback al estudiante:\n________________________________________________')
-    
-    bio = io.BytesIO()
-    doc.save(bio)
-    
-    st.download_button(
-        label="📥 Generar y Descargar mi Evidencia", 
-        data=bio.getvalue(), 
-        file_name=f"Chepeconde_{grado}_{seccion}_{nombre.replace(' ', '_')}.docx", 
-        mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-        on_click=bloquear_ficha,
-        type="primary",
-        use_container_width=True
-    )
+        doc.add_heading('NIVEL 1 (Literal)', level=2)
+        doc.add_paragraph('1) ¿Quién es el personaje principal y cuál es su mayor característica?').bold = True
+        doc.add_paragraph(f'Respuesta: {q1 if q1.strip() else "[No respondió]"}\n')
+        doc.add_paragraph('2) Describe brevemente cómo es El Pueblo de Chepeconde:').bold = True
+        doc.add_paragraph(f'Respuesta: {q2 if q2.strip() else "[No respondió]"}\n')
+        
+        doc.add_heading('NIVEL 2 (Inferencia)', level=2)
+        doc.add_paragraph('3) ¿Por qué crees que el protagonista tomó esa decisión difícil? ¿Qué hubieras hecho tú?').bold = True
+        doc.add_paragraph(f'Respuesta: {q3 if q3.strip() else "[No respondió]"}\n')
+        doc.add_paragraph('4) Identifica el conflicto principal de la historia. ¿Era un problema interno o externo?').bold = True
+        doc.add_paragraph(f'Respuesta: {q4 if q4.strip() else "[No respondió]"}\n')
+        
+        doc.add_heading('NIVEL 3 (Crítico)', level=2)
+        doc.add_paragraph('5) ¿Qué enseñanza o valor nos deja la historia de Chepeconde para la sociedad actual?').bold = True
+        doc.add_paragraph(f'Respuesta: {q5 if q5.strip() else "[No respondió]"}\n')
+        
+        doc.add_page_break()
+        doc.add_heading('Lista de Cotejo - Evaluación del Docente', level=2)
+        
+        table = doc.add_table(rows=1, cols=5)
+        table.style = 'Table Grid'
+        hdr_cells = table.rows[0].cells
+        hdr_cells[0].text, hdr_cells[1].text, hdr_cells[2].text, hdr_cells[3].text, hdr_cells[4].text = 'CRITERIOS DE EVALUACIÓN', 'INICIO', 'PROCESO', 'LOGRADO', 'DESTACADO'
+        criterios = [
+            "NIVEL 1: Identifica correctamente personajes y escenarios basándose en la obra.",
+            "NIVEL 2: Analiza los motivos y clasifica los conflictos de la trama.",
+            "NIVEL 3: Argumenta sólidamente una reflexión vinculada al texto."
+        ]
+        for crit in criterios:
+            row_cells = table.add_row().cells
+            row_cells[0].text, row_cells[1].text, row_cells[2].text, row_cells[3].text, row_cells[4].text = crit, "[   ]", "[   ]", "[   ]", "[   ]"
+            
+        doc.add_paragraph('\nObservaciones / Feedback al estudiante:\n________________________________________________')
+        
+        bio = io.BytesIO()
+        doc.save(bio)
+        
+        st.download_button(
+            label="📥 Confirmar Registro y Descargar Evidencia", 
+            data=bio.getvalue(), 
+            file_name=f"Chepeconde_{grado}_{seccion}_{nombre.replace(' ', '_')}.docx", 
+            mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+            on_click=registrar_y_bloquear,
+            args=(nombre, institucion, nivel, grado, seccion, area_curso, profesor),
+            type="primary",
+            use_container_width=True
+        )
