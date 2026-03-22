@@ -28,12 +28,12 @@ def ya_participo(nombre, grado, seccion):
             return False
         for row in data[1:]:
             if len(row) >= 6:
-                # Compara que no exista alguien con el mismo Nombre, Grado y Sección
                 if row[1].strip().lower() == nombre.strip().lower() and row[4] == grado and row[5] == seccion:
                     return True
         return False
     except Exception as e:
-        return False # Fallback de seguridad por si hay un micro-corte de internet
+        st.error(f"Error al leer la base de datos: {e}")
+        return False 
 
 def registrar_y_bloquear(nombre, inst, nivel, grado, seccion, area, prof):
     st.session_state.ficha_completada = True
@@ -41,8 +41,8 @@ def registrar_y_bloquear(nombre, inst, nivel, grado, seccion, area, prof):
         sheet = get_google_sheet()
         fecha_str = datetime.now().strftime("%d/%m/%Y %H:%M")
         sheet.append_row([fecha_str, nombre.upper(), inst.upper(), nivel, grado, seccion, area.upper(), prof, "COMPLETADO"])
-    except:
-        pass
+    except Exception as e:
+        st.error(f"Error al guardar en Google Sheets: {e}")
 
 # --- FUNCIONES DE ESTADO ---
 if 'ficha_completada' not in st.session_state: st.session_state.ficha_completada = False
